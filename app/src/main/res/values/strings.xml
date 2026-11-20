@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Waze רכב/אופנוע</string>
+    <string name="accessibility_label">Waze רכב/אופנוע</string>
+    <string name="accessibility_description">משמש רק כדי ללחוץ בשבילך על מסך ההגדרות של Waze ולהחליף את סוג הרכב בין רכב פרטי לאופנוע. השירות פועל רק בתוך Waze ורק אחרי לחיצה על הווידגט.</string>
+    <string name="mode_car">רכב</string>
+    <string name="mode_moto">אופנוע</string>
+    <string name="enable_service_toast">יש להפעיל את שירות הנגישות של \"Waze רכב/אופנוע\"</string>
+    <string name="waze_missing">Waze לא מותקן</string>
+    <string name="switching_to">מחליף ל%1$s…</string>
+    <string name="switched_to">Waze עבר ל%1$s ✔</string>
+    <string name="switch_failed">לא הצלחתי להחליף — פתח את האפליקציה לפרטים</string>
+</resources>
