@@ -15,11 +15,24 @@ android {
         versionName = "1.1"
     }
 
+    // CI signs with a fixed key from the repo secrets (SIGNING_KEYSTORE_BASE64 / SIGNING_KEYSTORE_PASSWORD),
+    // so each new APK installs over the previous one. Without them, fall back to the debug key.
+    val keystorePath = System.getenv("SIGNING_KEYSTORE_PATH")
+    val keystorePassword = System.getenv("SIGNING_KEYSTORE_PASSWORD")
+    val hasReleaseKey = !keystorePath.isNullOrBlank() && !keystorePassword.isNullOrBlank() && file(keystorePath).exists()
+    if (hasReleaseKey) {
+        signingConfigs.create("release") {
+            storeFile = file(keystorePath!!)
+            storePassword = keystorePassword
+            keyAlias = "wazetoggle"
+            keyPassword = keystorePassword
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
-            // Signed with the debug key so the release APK is installable without a keystore.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName(if (hasReleaseKey) "release" else "debug")
         }
     }
     compileOptions {
