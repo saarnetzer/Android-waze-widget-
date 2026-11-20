@@ -23,11 +23,12 @@ class VehicleWidgetProvider : AppWidgetProvider() {
 
             val mode = Prefs(context).mode
             val views = RemoteViews(context.packageName, R.layout.widget_layout)
-            views.setTextViewText(R.id.widget_icon, if (busy) "⏳" else if (mode == Mode.CAR) "🚗" else "🏍️")
-            views.setTextViewText(
-                R.id.widget_label,
-                context.getString(if (mode == Mode.CAR) R.string.mode_car else R.string.mode_moto)
-            )
+            val name = context.getString(if (mode == Mode.CAR) R.string.mode_car else R.string.mode_moto)
+            views.setImageViewResource(R.id.widget_icon, if (mode == Mode.CAR) R.drawable.ic_car else R.drawable.ic_moto)
+            views.setContentDescription(R.id.widget_icon, name)
+            // Dim the icon while a switch is in progress.
+            views.setInt(R.id.widget_icon, "setImageAlpha", if (busy) 110 else 255)
+            views.setTextViewText(R.id.widget_label, if (busy) context.getString(R.string.switching_short) else name)
             views.setInt(
                 R.id.widget_root, "setBackgroundResource",
                 if (mode == Mode.CAR) R.drawable.widget_bg else R.drawable.widget_bg_moto
