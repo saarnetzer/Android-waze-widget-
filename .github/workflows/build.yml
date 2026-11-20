@@ -19,7 +19,7 @@ jobs:
           java-version: 17
       - uses: android-actions/setup-android@v3
       - name: Build
-        run: ./gradlew assembleRelease --no-daemon
+        run: ./gradlew testDebugUnitTest assembleRelease --no-daemon
       - name: Rename APK
         run: cp app/build/outputs/apk/release/app-release.apk waze-vehicle-toggle.apk
       - uses: actions/upload-artifact@v4

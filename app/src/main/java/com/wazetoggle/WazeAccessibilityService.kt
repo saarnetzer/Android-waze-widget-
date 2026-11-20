@@ -185,25 +185,22 @@ class WazeAccessibilityService : AccessibilityService() {
 
     // ---------- node helpers ----------
 
-    private fun normalize(s: CharSequence?): String =
-        s?.toString()
-            ?.replace(Regex("[\\u200e\\u200f\\u202a-\\u202e\\u2066-\\u2069]"), "") // bidi marks
-            ?.trim()?.trimEnd(':')?.trim()?.lowercase()
-            ?: ""
-
     private fun label(node: AccessibilityNodeInfo): String =
         node.text?.toString() ?: node.contentDescription?.toString() ?: "?"
 
+    /** Returns a visible node matching the labels; earlier labels in the list win. */
     private fun findByLabels(root: AccessibilityNodeInfo, labels: List<String>): AccessibilityNodeInfo? {
-        val wanted = labels.map { normalize(it) }.filter { it.isNotEmpty() }.toSet()
+        val wanted = labels.map { Labels.normalize(it) }.filter { it.isNotEmpty() }.distinct()
         if (wanted.isEmpty()) return null
-        var best: AccessibilityNodeInfo? = null
+        val hits = HashMap<String, AccessibilityNodeInfo>()
         walk(root) { n ->
-            if (best == null && n.isVisibleToUser &&
-                (normalize(n.text) in wanted || normalize(n.contentDescription) in wanted)
-            ) best = n
+            if (n.isVisibleToUser) {
+                for (key in listOf(Labels.normalize(n.text), Labels.normalize(n.contentDescription))) {
+                    if (key in wanted && key !in hits) hits[key] = n
+                }
+            }
         }
-        return best
+        return wanted.firstNotNullOfOrNull { hits[it] }
     }
 
     private fun findScrollable(root: AccessibilityNodeInfo): AccessibilityNodeInfo? {

@@ -13,19 +13,22 @@ enum class Mode { CAR, MOTO;
  */
 enum class Step(val key: String, val title: String, val defaults: List<String>) {
     MENU("menu", "1. כפתור התפריט (My Waze)",
-        listOf("My Waze", "Waze שלי", "הוויז שלי", "Menu", "תפריט", "Open menu", "פתיחת תפריט")),
+        listOf("My Waze", "Waze שלי", "ה-Waze שלי", "הWaze שלי", "וויז שלי", "הוויז שלי", "ויז שלי",
+            "Menu", "Main menu", "Open menu", "תפריט", "תפריט ראשי", "פתיחת תפריט", "פתח תפריט")),
     SETTINGS("settings", "2. הגדרות",
-        listOf("Settings", "הגדרות")),
+        listOf("Settings", "הגדרות", "Waze settings", "הגדרות Waze")),
     NAVIGATION("navigation", "3. ניווט",
-        listOf("Navigation", "ניווט")),
+        listOf("Navigation", "Navigation settings", "ניווט", "הגדרות ניווט")),
     VEHICLE_DETAILS("vehicle_details", "4. פרטי הרכב",
-        listOf("Vehicle details", "Vehicle info", "פרטי הרכב", "פרטי רכב", "פרטי כלי הרכב")),
+        listOf("Vehicle details", "Vehicle info", "Your vehicle", "My vehicle",
+            "פרטי הרכב", "פרטי רכב", "פרטי כלי הרכב", "הרכב שלי", "הרכב שלך")),
     VEHICLE_TYPE("vehicle_type", "5. סוג הרכב",
-        listOf("Vehicle type", "סוג רכב", "סוג הרכב", "סוג כלי הרכב")),
+        listOf("Vehicle type", "Type of vehicle", "סוג רכב", "סוג הרכב", "סוג כלי רכב", "סוג כלי הרכב")),
     TARGET_CAR("target_car", "6א. אפשרות 'רכב פרטי'",
-        listOf("Private", "Car", "Private car", "Private vehicle", "פרטי", "רכב פרטי")),
+        listOf("Private", "Private car", "Private vehicle", "Car",
+            "פרטי", "רכב פרטי", "מכונית פרטית", "מכונית")),
     TARGET_MOTO("target_moto", "6ב. אפשרות 'אופנוע'",
-        listOf("Motorcycle", "Motorbike", "אופנוע"));
+        listOf("Motorcycle", "Motorbike", "Motor bike", "אופנוע", "קטנוע", "דו-גלגלי"));
 }
 
 class Prefs(context: Context) {
