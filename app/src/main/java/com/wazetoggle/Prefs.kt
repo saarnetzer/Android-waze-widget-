@@ -11,25 +11,40 @@ enum class Mode { CAR, MOTO;
  * (Hebrew + English) that identify the button to tap. All lists are user-editable from
  * the app's main screen, in case Waze renames something.
  */
-enum class Step(val key: String, val title: String, val defaults: List<String>) {
+enum class Step(
+    val key: String,
+    val title: String,
+    val defaults: List<String>,
+    /**
+     * Waze exposes many controls to accessibility only as internal IDs in their content description
+     * (e.g. "HAMBURGER_BUTTON", "START_STATE_SEARCH_FIELD"), often in English even when the UI is Hebrew.
+     * A node whose ID-like description / view id contains one of these tokens also matches.
+     */
+    val idHints: List<String> = emptyList(),
+) {
     MAP("map", "0. סימן שהמפה הראשית פתוחה",
-        listOf("לאן?", "Where to?", "Search", "חיפוש")),
-    MENU("menu", "1. כפתור התפריט ☰ (אם יש לו תיאור)",
-        listOf("My Waze", "Waze שלי", "ה-Waze שלי", "הWaze שלי", "וויז שלי", "הוויז שלי", "ויז שלי",
-            "Menu", "Main menu", "Open menu", "תפריט", "תפריט ראשי", "פתיחת תפריט", "פתח תפריט")),
+        listOf("START_STATE_SEARCH_FIELD", "WAZE_BOTTOM_SHEET_HANDLE", "לאן?", "Where to?"),
+        listOf("START_STATE_SEARCH_FIELD", "START_STATE_")),
+    MENU("menu", "1. כפתור התפריט ☰",
+        listOf("HAMBURGER_BUTTON", "Menu", "Main menu", "Open menu", "My Waze",
+            "תפריט", "תפריט ראשי", "פתיחת תפריט", "Waze שלי"),
+        listOf("HAMBURGER", "MAIN_MENU")),
     SETTINGS("settings", "2. הגדרות",
-        listOf("Settings", "הגדרות", "Waze settings", "הגדרות Waze")),
-    NAVIGATION("navigation", "3. ניווט",
-        listOf("Navigation", "Navigation settings", "ניווט", "הגדרות ניווט")),
-    VEHICLE_DETAILS("vehicle_details", "4. פרטי הרכב",
-        listOf("פרטי הרכב", "Vehicle details", "Vehicle info", "Your vehicle", "My vehicle", "פרטי רכב", "פרטי כלי הרכב", "הרכב שלי", "הרכב שלך")),
-    VEHICLE_TYPE("vehicle_type", "5. סוג הרכב",
-        listOf("סוג רכב", "Vehicle type", "Type of vehicle", "סוג הרכב", "סוג כלי רכב", "סוג כלי הרכב")),
-    TARGET_CAR("target_car", "6א. אפשרות 'רכב פרטי'",
-        listOf("רכב פרטי", "Private car", "Private", "Private vehicle", "Car",
-            "פרטי", "מכונית פרטית", "מכונית")),
-    TARGET_MOTO("target_moto", "6ב. אפשרות 'אופנוע'",
-        listOf("Motorcycle", "Motorbike", "Motor bike", "אופנוע", "קטנוע", "דו-גלגלי"));
+        listOf("הגדרות", "Settings", "Waze settings", "הגדרות Waze"),
+        listOf("SETTINGS")),
+    VEHICLE_DETAILS("vehicle_details", "3. פרטי הרכב",
+        listOf("פרטי הרכב", "Vehicle details", "Vehicle info", "Your vehicle", "My vehicle",
+            "פרטי רכב", "פרטי כלי הרכב", "הרכב שלי"),
+        listOf("VEHICLE_DETAILS", "VEHICLE_INFO", "MY_VEHICLE")),
+    VEHICLE_TYPE("vehicle_type", "4. סוג רכב",
+        listOf("סוג רכב", "Vehicle type", "Type of vehicle", "סוג הרכב", "סוג כלי רכב"),
+        listOf("VEHICLE_TYPE")),
+    TARGET_CAR("target_car", "5א. אפשרות 'רכב פרטי'",
+        listOf("רכב פרטי", "Private car", "Private", "Private vehicle", "Car", "פרטי"),
+        listOf("PRIVATE")),
+    TARGET_MOTO("target_moto", "5ב. אפשרות 'אופנוע'",
+        listOf("אופנוע", "Motorcycle", "Motorbike", "Motor bike"),
+        listOf("MOTORCYCLE", "MOTORBIKE"));
 }
 
 class Prefs(context: Context) {

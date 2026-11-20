@@ -47,12 +47,13 @@ class WazeAccessibilityService : AccessibilityService() {
     private var scrollsThisStep = 0
     private var backsAtStart = 0
     private var relaunched = false
+    private var dumpedStep = -1
     private var lastWazeTexts: List<String> = emptyList()
     private val log = StringBuilder()
 
     private val walkSteps: List<Step>
         get() = listOf(
-            Step.MENU, Step.SETTINGS, Step.NAVIGATION, Step.VEHICLE_DETAILS, Step.VEHICLE_TYPE,
+            Step.MENU, Step.SETTINGS, Step.VEHICLE_DETAILS, Step.VEHICLE_TYPE,
             if (target == Mode.CAR) Step.TARGET_CAR else Step.TARGET_MOTO
         )
 
@@ -87,6 +88,7 @@ class WazeAccessibilityService : AccessibilityService() {
         scrollsThisStep = 0
         backsAtStart = 0
         relaunched = false
+        dumpedStep = -1
         lastWazeTexts = emptyList()
         startedAt = SystemClock.uptimeMillis()
         lastProgressAt = startedAt
@@ -122,9 +124,18 @@ class WazeAccessibilityService : AccessibilityService() {
         // The final option (e.g. "Private") can also appear as a subtitle on earlier screens,
         // so we only accept it once we've opened the vehicle-type list – or as a last resort.
         val stuck = now - lastProgressAt > STUCK_MS && scrollsThisStep >= MAX_SCROLLS
-        for (i in lastIdx downTo step) {
-            if (i == lastIdx && step < lastIdx && !stuck) continue
-            val node = findByLabels(root, prefs.labels(steps[i])) ?: continue
+        // Exact labels first (furthest step wins), then Waze's internal ID hints.
+        val node: AccessibilityNodeInfo?
+        val i: Int
+        run {
+            for (byId in listOf(false, true)) for (k in lastIdx downTo step) {
+                if (k == lastIdx && step < lastIdx && !stuck) continue
+                val n = if (byId) findById(root, steps[k].idHints) else findByLabels(root, prefs.labels(steps[k]))
+                if (n != null) { node = n; i = k; return@run }
+            }
+            node = null; i = -1
+        }
+        if (node != null) {
             note("step ${steps[i].key}: tap '${label(node)}'")
             if (!tap(node)) note("  tap failed")
             step = i + 1
@@ -136,7 +147,7 @@ class WazeAccessibilityService : AccessibilityService() {
 
         // On the main map the menu is an icon-only "☰" button in the top corner, with no text
         // we can match. The map itself is recognised by its "Where to?" search bar.
-        if (step == 0 && findByLabels(root, prefs.labels(Step.MAP)) != null) {
+        if (step == 0 && isMap(root)) {
             val btn = findCornerButton(root)
             if (btn != null) {
                 note("map: tap menu icon [${btn.contentDescription ?: btn.viewIdResourceName ?: "?"}]")
@@ -154,6 +165,10 @@ class WazeAccessibilityService : AccessibilityService() {
         // Nothing matched on this screen.
         if (now - lastProgressAt > STUCK_MS) {
             lastWazeTexts = visibleTexts(root)
+            if (dumpedStep != step) {
+                dumpedStep = step
+                note("screen while looking for ${steps[step].key}: " + lastWazeTexts.joinToString(" | "))
+            }
             if (step == 0 && backsAtStart < 2) {
                 // Waze reopened on some inner screen – back out toward the map.
                 backsAtStart++
@@ -209,7 +224,7 @@ class WazeAccessibilityService : AccessibilityService() {
         handler.postDelayed({
             val root = rootInActiveWindow
             if (root == null || root.packageName != WAZE) return@postDelayed
-            if (findByLabels(root, prefs.labels(Step.MAP)) != null) return@postDelayed
+            if (isMap(root)) return@postDelayed
             performGlobalAction(GLOBAL_ACTION_BACK)
             returnToMap(count + 1)
         }, 450)
@@ -284,6 +299,24 @@ class WazeAccessibilityService : AccessibilityService() {
             .addStroke(GestureDescription.StrokeDescription(path, 0, 60))
             .build()
         return dispatchGesture(gesture, null, null)
+    }
+
+    private fun isMap(root: AccessibilityNodeInfo) =
+        findByLabels(root, prefs.labels(Step.MAP)) != null || findById(root, Step.MAP.idHints) != null
+
+    private val idLike = Regex("^[A-Z0-9_]{3,}$")
+
+    /** A visible node whose ID-like content description, or view id, contains one of the tokens. */
+    private fun findById(root: AccessibilityNodeInfo, tokens: List<String>): AccessibilityNodeInfo? {
+        if (tokens.isEmpty()) return null
+        var found: AccessibilityNodeInfo? = null
+        walk(root) { n ->
+            if (found != null || !n.isVisibleToUser) return@walk
+            val desc = n.contentDescription?.toString()?.trim()?.takeIf { idLike.matches(it) }
+            val vid = n.viewIdResourceName?.substringAfter(":id/")?.uppercase()
+            if (tokens.any { t -> desc?.contains(t) == true || vid?.contains(t) == true }) found = n
+        }
+        return found
     }
 
     private fun findScrollable(root: AccessibilityNodeInfo): AccessibilityNodeInfo? {
