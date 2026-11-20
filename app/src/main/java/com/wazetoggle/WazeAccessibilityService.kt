@@ -46,6 +46,8 @@ class WazeAccessibilityService : AccessibilityService() {
     private var lastProgressAt = 0L
     private var scrollsThisStep = 0
     private var backsAtStart = 0
+    private var relaunched = false
+    private var lastWazeTexts: List<String> = emptyList()
     private val log = StringBuilder()
 
     private val walkSteps: List<Step>
@@ -84,6 +86,8 @@ class WazeAccessibilityService : AccessibilityService() {
         step = 0
         scrollsThisStep = 0
         backsAtStart = 0
+        relaunched = false
+        lastWazeTexts = emptyList()
         startedAt = SystemClock.uptimeMillis()
         lastProgressAt = startedAt
         log.setLength(0)
@@ -102,6 +106,14 @@ class WazeAccessibilityService : AccessibilityService() {
 
         val root = rootInActiveWindow
         if (root == null || root.packageName != WAZE) {
+            // If an earlier "back" took us out of Waze, bring it back once.
+            if (backsAtStart > 0 && !relaunched) {
+                relaunched = true
+                packageManager.getLaunchIntentForPackage(WAZE)?.let {
+                    note("left Waze, relaunching")
+                    startActivity(it.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))
+                }
+            }
             return schedule(TICK_MS)
         }
 
@@ -122,12 +134,30 @@ class WazeAccessibilityService : AccessibilityService() {
             return schedule(SETTLE_MS)
         }
 
+        // On the main map the menu is an icon-only "☰" button in the top corner, with no text
+        // we can match. The map itself is recognised by its "Where to?" search bar.
+        if (step == 0 && findByLabels(root, prefs.labels(Step.MAP)) != null) {
+            val btn = findCornerButton(root)
+            if (btn != null) {
+                note("map: tap menu icon [${btn.contentDescription ?: btn.viewIdResourceName ?: "?"}]")
+                tap(btn)
+            } else {
+                note("map: tap menu corner by position")
+                tapCorner(root)
+            }
+            step = 1
+            scrollsThisStep = 0
+            lastProgressAt = now
+            return schedule(SETTLE_MS)
+        }
+
         // Nothing matched on this screen.
         if (now - lastProgressAt > STUCK_MS) {
-            if (step == 0 && backsAtStart < 3) {
-                // Waze may have reopened on some inner screen – back out toward the map.
+            lastWazeTexts = visibleTexts(root)
+            if (step == 0 && backsAtStart < 2) {
+                // Waze reopened on some inner screen – back out toward the map.
                 backsAtStart++
-                note("menu not found, pressing back")
+                note("map not found, pressing back")
                 performGlobalAction(GLOBAL_ACTION_BACK)
                 lastProgressAt = now
                 return schedule(SETTLE_MS)
@@ -165,19 +195,21 @@ class WazeAccessibilityService : AccessibilityService() {
     private fun fail(reason: String) {
         running = false
         note("FAILED: $reason (stuck at ${walkSteps.getOrNull(step)?.key})")
-        rootInActiveWindow?.let { note("visible texts: " + visibleTexts(it).joinToString(" | ")) }
+        val texts = rootInActiveWindow?.takeIf { it.packageName == WAZE }?.let { visibleTexts(it) }
+            ?: lastWazeTexts
+        note("Waze screen texts: " + texts.joinToString(" | ").ifEmpty { "(none captured)" })
         prefs.lastLog = log.toString()
         VehicleWidgetProvider.updateAll(this)
         toast(getString(R.string.switch_failed))
     }
 
-    /** Press back until the main map (menu button visible) is shown, max 6 times. */
+    /** Press back until the main map ("Where to?" visible) is shown, max 6 times. */
     private fun returnToMap(count: Int) {
         if (count >= 6) return
         handler.postDelayed({
             val root = rootInActiveWindow
             if (root == null || root.packageName != WAZE) return@postDelayed
-            if (findByLabels(root, prefs.labels(Step.MENU)) != null) return@postDelayed
+            if (findByLabels(root, prefs.labels(Step.MAP)) != null) return@postDelayed
             performGlobalAction(GLOBAL_ACTION_BACK)
             returnToMap(count + 1)
         }, 450)
@@ -201,6 +233,57 @@ class WazeAccessibilityService : AccessibilityService() {
             }
         }
         return wanted.firstNotNullOfOrNull { hits[it] }
+    }
+
+    /**
+     * The smallest clickable element whose centre is in the top-left or top-right corner
+     * (the ☰ button is top-left in both Hebrew and English Waze; right is a fallback for RTL builds).
+     * The top-left one wins.
+     */
+    private fun findCornerButton(root: AccessibilityNodeInfo): AccessibilityNodeInfo? {
+        val dm = resources.displayMetrics
+        val w = dm.widthPixels; val h = dm.heightPixels
+        val r = Rect()
+        var best: AccessibilityNodeInfo? = null
+        var bestScore = Long.MAX_VALUE
+        walk(root) { n ->
+            if (!n.isClickable || !n.isVisibleToUser) return@walk
+            n.getBoundsInScreen(r)
+            val area = r.width().toLong() * r.height()
+            if (area <= 0 || area > w.toLong() * h / 30) return@walk   // skip map / big panels
+            if (r.centerY() > h * 0.15) return@walk
+            val left = r.centerX() < w * 0.25
+            val right = r.centerX() > w * 0.75
+            if (!left && !right) return@walk
+            // speaker/report buttons sit top-right, so prefer left strongly
+            val score = area + if (left) 0 else 1_000_000_000L
+            if (score < bestScore) { bestScore = score; best = n }
+        }
+        // Only accept the right side if its description looks like a menu.
+        best?.let { b ->
+            b.getBoundsInScreen(r)
+            if (r.centerX() > w * 0.75) {
+                val d = Labels.normalize(b.contentDescription)
+                if (prefs.labels(Step.MENU).none { Labels.normalize(it) == d }) return null
+            }
+        }
+        return best
+    }
+
+    /** Last resort: a tap where the ☰ button sits on the map screen (≈12% across, 8% down). */
+    private fun tapCorner(root: AccessibilityNodeInfo) {
+        val r = Rect().also { root.getBoundsInScreen(it) }
+        val dm = resources.displayMetrics
+        if (r.isEmpty) r.set(0, 0, dm.widthPixels, dm.heightPixels)
+        tapAt(r.left + r.width() * 0.123f, r.top + dm.heightPixels * 0.08f)
+    }
+
+    private fun tapAt(x: Float, y: Float): Boolean {
+        val path = Path().apply { moveTo(x, y) }
+        val gesture = GestureDescription.Builder()
+            .addStroke(GestureDescription.StrokeDescription(path, 0, 60))
+            .build()
+        return dispatchGesture(gesture, null, null)
     }
 
     private fun findScrollable(root: AccessibilityNodeInfo): AccessibilityNodeInfo? {
@@ -235,11 +318,7 @@ class WazeAccessibilityService : AccessibilityService() {
         }
         val r = Rect().also { node.getBoundsInScreen(it) }
         if (r.isEmpty) return false
-        val path = Path().apply { moveTo(r.exactCenterX(), r.exactCenterY()) }
-        val gesture = GestureDescription.Builder()
-            .addStroke(GestureDescription.StrokeDescription(path, 0, 60))
-            .build()
-        return dispatchGesture(gesture, null, null)
+        return tapAt(r.exactCenterX(), r.exactCenterY())
     }
 
     // ---------- misc ----------
