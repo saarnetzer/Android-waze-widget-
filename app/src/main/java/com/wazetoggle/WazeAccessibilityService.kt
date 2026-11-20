@@ -218,16 +218,54 @@ class WazeAccessibilityService : AccessibilityService() {
         toast(getString(R.string.switch_failed))
     }
 
-    /** Press back until the main map ("Where to?" visible) is shown, max 6 times. */
+    private val closeLabels = listOf("Close", "סגירה", "סגור", "Dismiss", "X", "✕", "×")
+    private val closeIds = listOf("CLOSE", "DISMISS", "EXIT")
+
+    /**
+     * After switching, close Waze's settings with the X button (top corner) until the map is back.
+     * Falls back to Back only when no X can be found. Max 6 rounds.
+     */
     private fun returnToMap(count: Int) {
-        if (count >= 6) return
+        if (count >= 6) { prefs.lastLog = log.toString(); return }
         handler.postDelayed({
             val root = rootInActiveWindow
-            if (root == null || root.packageName != WAZE) return@postDelayed
-            if (isMap(root)) return@postDelayed
-            performGlobalAction(GLOBAL_ACTION_BACK)
+            if (root == null || root.packageName != WAZE) {
+                returnToMap(count + 1)
+                return@postDelayed
+            }
+            if (isMap(root)) {
+                note("back on map")
+                prefs.lastLog = log.toString()
+                return@postDelayed
+            }
+            val x = findByLabels(root, closeLabels) ?: findById(root, closeIds) ?: findTopRightButton(root)
+            if (x != null) {
+                note("close: tap '${label(x)}'")
+                tap(x)
+            } else {
+                note("close button not found, pressing back")
+                performGlobalAction(GLOBAL_ACTION_BACK)
+            }
             returnToMap(count + 1)
-        }, 450)
+        }, 600)
+    }
+
+    /** The smallest clickable in the top-right corner – where Waze's X sits on settings screens and the side menu. */
+    private fun findTopRightButton(root: AccessibilityNodeInfo): AccessibilityNodeInfo? {
+        val dm = resources.displayMetrics
+        val w = dm.widthPixels; val h = dm.heightPixels
+        val r = Rect()
+        var best: AccessibilityNodeInfo? = null
+        var bestArea = Long.MAX_VALUE
+        walk(root) { n ->
+            if (!n.isClickable || !n.isVisibleToUser) return@walk
+            n.getBoundsInScreen(r)
+            val area = r.width().toLong() * r.height()
+            if (area <= 0 || area > w.toLong() * h / 30) return@walk
+            if (r.centerY() > h * 0.18 || r.centerX() < w * 0.75) return@walk
+            if (area < bestArea) { bestArea = area; best = n }
+        }
+        return best
     }
 
     // ---------- node helpers ----------
