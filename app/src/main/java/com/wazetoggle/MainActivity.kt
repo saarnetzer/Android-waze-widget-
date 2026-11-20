@@ -38,7 +38,8 @@ class MainActivity : Activity() {
         col.addView(header("איך זה עובד"))
         col.addView(text(
             "1. הפעל את שירות הנגישות (כפתור למטה).\n" +
-            "2. הוסף למסך הבית את הווידגט \"Waze רכב/אופנוע\".\n" +
+            "2. הוסף למסך הבית את הווידגט (כפתור למטה, או: לחיצה ארוכה על המסך ← ווידג'טים). " +
+            "שים לב: אייקון האפליקציה עצמו לא מתחלף – רק הווידגט.\n" +
             "3. לחיצה על הווידגט פותחת את Waze ומחליפה את סוג הרכב אוטומטית (כ-3 שניות)."
         ))
 
@@ -48,6 +49,8 @@ class MainActivity : Activity() {
         col.addView(button("פתח הגדרות נגישות") {
             startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
         })
+
+        col.addView(button("➕ הוסף את הווידגט למסך הבית") { pinWidget() })
 
         col.addView(header("מצב נוכחי ב-Waze"))
         col.addView(text("אם הווידגט לא תואם למה שמוגדר בפועל ב-Waze, תקן כאן:"))
@@ -97,6 +100,14 @@ class MainActivity : Activity() {
         modeGroup.check(if (prefs.mode == Mode.MOTO) 2 else 1)
         logView.text = prefs.lastLog.ifBlank { "(עדיין לא בוצעה החלפה)" }
         VehicleWidgetProvider.updateAll(this)
+    }
+
+    private fun pinWidget() {
+        val mgr = android.appwidget.AppWidgetManager.getInstance(this)
+        val provider = android.content.ComponentName(this, VehicleWidgetProvider::class.java)
+        if (!mgr.isRequestPinAppWidgetSupported || !mgr.requestPinAppWidget(provider, null, null)) {
+            Toast.makeText(this, "המסך הזה לא תומך בהוספה אוטומטית – לחיצה ארוכה על מסך הבית ← ווידג'טים", Toast.LENGTH_LONG).show()
+        }
     }
 
     private fun header(s: String) = TextView(this).apply {
