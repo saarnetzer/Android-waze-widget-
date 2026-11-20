@@ -226,7 +226,11 @@ class WazeAccessibilityService : AccessibilityService() {
      * Falls back to Back only when no X can be found. Max 6 rounds.
      */
     private fun returnToMap(count: Int) {
-        if (count >= 6) { prefs.lastLog = log.toString(); return }
+        if (count >= 6) {
+            rootInActiveWindow?.let { note("gave up returning to map; screen: " + visibleTexts(it).joinToString(" | ")) }
+            prefs.lastLog = log.toString()
+            return
+        }
         handler.postDelayed({
             val root = rootInActiveWindow
             if (root == null || root.packageName != WAZE) {
@@ -339,8 +343,18 @@ class WazeAccessibilityService : AccessibilityService() {
         return dispatchGesture(gesture, null, null)
     }
 
-    private fun isMap(root: AccessibilityNodeInfo) =
-        findByLabels(root, prefs.labels(Step.MAP)) != null || findById(root, Step.MAP.idHints) != null
+    /**
+     * The main map is showing. Waze opens its menu and settings *over* the map and keeps the map's
+     * nodes in the accessibility tree, so the map markers alone aren't enough: the screen also must
+     * not contain anything from the side menu or the settings screens.
+     */
+    private fun isMap(root: AccessibilityNodeInfo): Boolean {
+        val mapMarker = findByLabels(root, prefs.labels(Step.MAP)) != null || findById(root, Step.MAP.idHints) != null
+        if (!mapMarker) return false
+        val overlay = listOf(Step.SETTINGS, Step.VEHICLE_DETAILS, Step.VEHICLE_TYPE, Step.TARGET_CAR, Step.TARGET_MOTO)
+            .any { findByLabels(root, prefs.labels(it)) != null }
+        return !overlay
+    }
 
     private val idLike = Regex("^[A-Z0-9_]{3,}$")
 
