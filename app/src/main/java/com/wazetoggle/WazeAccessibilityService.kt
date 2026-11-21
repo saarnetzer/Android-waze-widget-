@@ -227,7 +227,9 @@ class WazeAccessibilityService : AccessibilityService() {
      */
     private fun returnToMap(count: Int) {
         if (count >= 6) {
-            rootInActiveWindow?.let { note("gave up returning to map; screen: " + visibleTexts(it).joinToString(" | ")) }
+            // Only ever read Waze's own screen – never another app that may be in front.
+            rootInActiveWindow?.takeIf { it.packageName == WAZE }
+                ?.let { note("gave up returning to map; screen: " + visibleTexts(it).joinToString(" | ")) }
             prefs.lastLog = log.toString()
             return
         }
@@ -336,6 +338,11 @@ class WazeAccessibilityService : AccessibilityService() {
     }
 
     private fun tapAt(x: Float, y: Float): Boolean {
+        // A gesture lands on whatever is on screen, so only dispatch it while Waze is in front.
+        if (rootInActiveWindow?.packageName != WAZE) {
+            note("skip tap: Waze is not in front")
+            return false
+        }
         val path = Path().apply { moveTo(x, y) }
         val gesture = GestureDescription.Builder()
             .addStroke(GestureDescription.StrokeDescription(path, 0, 60))

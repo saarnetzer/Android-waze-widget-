@@ -23,6 +23,8 @@ class MainActivity : Activity() {
     private lateinit var modeGroup: RadioGroup
     private lateinit var logView: TextView
     private val labelFields = mutableMapOf<Step, EditText>()
+    private val carId = View.generateViewId()
+    private val motoId = View.generateViewId()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -56,10 +58,10 @@ class MainActivity : Activity() {
         col.addView(text("אם הווידגט לא תואם למה שמוגדר בפועל ב-Waze, תקן כאן:"))
         modeGroup = RadioGroup(this).apply {
             orientation = RadioGroup.HORIZONTAL
-            addView(RadioButton(context).apply { id = 1; text = "🚗 רכב" })
-            addView(RadioButton(context).apply { id = 2; text = "🏍️ אופנוע" })
+            addView(RadioButton(context).apply { id = carId; text = "🚗 רכב" })
+            addView(RadioButton(context).apply { id = motoId; text = "🏍️ אופנוע" })
             setOnCheckedChangeListener { _, id ->
-                prefs.mode = if (id == 2) Mode.MOTO else Mode.CAR
+                prefs.mode = if (id == motoId) Mode.MOTO else Mode.CAR
                 VehicleWidgetProvider.updateAll(this@MainActivity)
             }
         }
@@ -69,6 +71,11 @@ class MainActivity : Activity() {
         col.addView(header("יומן הריצה האחרונה"))
         logView = text("").apply { textSize = 12f; typeface = Typeface.MONOSPACE; textDirection = View.TEXT_DIRECTION_LTR }
         col.addView(logView)
+        col.addView(text("היומן נשמר רק בטלפון, וייתכן שיופיעו בו טקסטים ממסך Waze (למשל יעדים אחרונים).").apply { textSize = 12f })
+        col.addView(button("🗑️ נקה יומן") {
+            prefs.lastLog = ""
+            logView.text = "(היומן נוקה)"
+        })
 
         col.addView(header("טקסטים לזיהוי (מתקדם)"))
         col.addView(text(
@@ -97,7 +104,7 @@ class MainActivity : Activity() {
         super.onResume()
         val on = WazeAccessibilityService.instance != null
         status.text = if (on) "✅ שירות הנגישות פעיל" else "❌ שירות הנגישות כבוי – יש להפעיל אותו"
-        modeGroup.check(if (prefs.mode == Mode.MOTO) 2 else 1)
+        modeGroup.check(if (prefs.mode == Mode.MOTO) motoId else carId)
         logView.text = prefs.lastLog.ifBlank { "(עדיין לא בוצעה החלפה)" }
         VehicleWidgetProvider.updateAll(this)
     }
